@@ -21,7 +21,7 @@ class LinkedInProviderTest extends TestCase
         m::close();
     }
 
-    public function test_it_can_map_a_user_without_an_email_address()
+    public function test_it_can_map_a_user()
     {
         $request = m::mock(Request::class);
         $request->allows('input')->with('code')->andReturns('fake-code');
@@ -33,21 +33,14 @@ class LinkedInProviderTest extends TestCase
         $accessTokenResponse->allows('getBody')->andReturns($stream);
 
         $basicProfileStream = m::mock(StreamInterface::class);
-        $basicProfileStream->allows('__toString')->andReturns(json_encode(['id' => $userId = 1]));
+        $basicProfileStream->allows('__toString')->andReturns(json_encode(['sub' => $userId = 1]));
 
         $basicProfileResponse = m::mock(ResponseInterface::class);
         $basicProfileResponse->allows('getBody')->andReturns($basicProfileStream);
 
-        $emailAddressStream = m::mock(StreamInterface::class);
-        $emailAddressStream->allows('__toString')->andReturns(json_encode(['elements' => []]));
-
-        // Make sure email address response contains no values.
-        $emailAddressResponse = m::mock(ResponseInterface::class);
-        $emailAddressResponse->allows('getBody')->andReturns($emailAddressStream);
-
         $guzzle = m::mock(Client::class);
         $guzzle->expects('post')->andReturns($accessTokenResponse);
-        $guzzle->allows('get')->with('https://api.linkedin.com/v2/me', [
+        $guzzle->allows('get')->with('https://api.linkedin.com/v2/userinfo', [
             RequestOptions::HEADERS => [
                 'Authorization' => 'Bearer fake-token',
                 'X-RestLi-Protocol-Version' => '2.0.0',
@@ -56,16 +49,6 @@ class LinkedInProviderTest extends TestCase
                 'projection' => '(id,firstName,lastName,profilePicture(displayImage~:playableStreams))',
             ],
         ])->andReturns($basicProfileResponse);
-        $guzzle->allows('get')->with('https://api.linkedin.com/v2/emailAddress', [
-            RequestOptions::HEADERS => [
-                'Authorization' => 'Bearer fake-token',
-                'X-RestLi-Protocol-Version' => '2.0.0',
-            ],
-            RequestOptions::QUERY => [
-                'q' => 'members',
-                'projection' => '(elements*(handle~))',
-            ],
-        ])->andReturns($emailAddressResponse);
 
         $provider = new LinkedInProvider($request, 'client_id', 'client_secret', 'redirect');
         $provider->stateless();
